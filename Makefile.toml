@@ -1,0 +1,10 @@
+[tasks.run]
+command = "cargo"
+args = ["run"]
+dependencies = ["clear"]
+
+[tasks.clear]
+script = '''
+  clear
+  clear
+'''
