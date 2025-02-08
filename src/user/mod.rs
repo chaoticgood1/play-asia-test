@@ -1,4 +1,5 @@
-use std::{sync::Mutex, collections::HashMap};
+use std::{collections::HashMap, sync::Mutex, time::Duration};
+use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
 use poem::{handler, http::StatusCode, post, web::Json, Error, Response, Result, Route};
 use serde::{Serialize, Deserialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -7,14 +8,13 @@ use once_cell::sync::Lazy;
 pub fn route() -> Route {
   return Route::new()
     .at("/signup", post(sign_up))
+    .at("/login", post(login))
 }
 
 #[handler]
-async fn sign_up(user: Json<User>) -> Result<Json<serde_json::Value>> {
-  println!("{:?}", user);
-
+async fn sign_up(sign_up: Json<User>) -> Result<Json<serde_json::Value>> {
   let mut users = USERS.lock().unwrap();
-  if users.contains_key(&user.name) {
+  if users.contains_key(&sign_up.name) {
     return Result::Err(
       Error::from_response(
         Response::builder()
@@ -23,12 +23,13 @@ async fn sign_up(user: Json<User>) -> Result<Json<serde_json::Value>> {
           .body(serde_json::to_string(&ErrorResponse {
             error: "User already exists".to_string(),
             msg: "Please use different credentials".to_string()
-          }).unwrap())
+          })
+          .unwrap())
       )
     )
   }
 
-  let pass = match hash(user.pass.clone(), DEFAULT_COST) {
+  let hashed_pass = match hash(sign_up.pass.clone(), DEFAULT_COST) {
     Ok(p) => p,
     Err(e) => return Result::Err(
       Error::from_response(
@@ -38,21 +39,70 @@ async fn sign_up(user: Json<User>) -> Result<Json<serde_json::Value>> {
           .body(serde_json::to_string(&ErrorResponse {
             error: "Error password issue".to_string(),
             msg: "Please contact support".to_string()
-          }).unwrap())
+          })
+          .unwrap())
       )
     )
   };
 
-  users.insert(user.name.to_string(), pass);
+  users.insert(sign_up.name.to_string(), hashed_pass);
   
   Ok(Json(serde_json::json!({
-    "code": 200,
-    "msg": "Test"
+    "msg": "Successfully signed up"
   })))
 }
 
-async fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
-  hash(password, DEFAULT_COST)
+#[handler]
+async fn login(login: Json<User>) -> Result<Json<serde_json::Value>> {
+  let mut users = USERS.lock().unwrap();
+
+  let hashed_pass = match users.get(&login.name) {
+    Some(u) => u,
+    None => return Result::Err(
+      Error::from_response(
+        Response::builder()
+          .status(StatusCode::UNAUTHORIZED)
+          .header("Content-Type", "application/json")
+          .body(serde_json::to_string(&ErrorResponse {
+            error: "User not found".to_string(),
+            msg: "The user doesn't exist".to_string()
+          })
+          .unwrap())
+      )
+    )
+  };
+
+
+  match verify(login.pass.clone(), &hashed_pass) {
+    Ok(res) => res,
+    Err(e) => return Result::Err(
+      Error::from_response(
+        Response::builder()
+          .status(StatusCode::UNAUTHORIZED)
+          .header("Content-Type", "application/json")
+          .body(serde_json::to_string(&ErrorResponse {
+            error: "Invalid credentials".to_string(),
+            msg: "Wrong username or password".to_string()
+          })
+          .unwrap())
+      )
+    )
+  };
+
+  Ok(Json(serde_json::json!({
+    "msg": "Successfully logged in",
+    "jwt": create_jwt(&login.name)
+  })))
+}
+
+
+fn create_jwt(name: &str) -> String {
+  let claims = Claims {
+    name: name.to_string(),
+    exp: (chrono::Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
+  };
+
+  encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET_KEY.as_ref())).unwrap()
 }
 
 
@@ -97,7 +147,11 @@ struct SignUpResponse {
   jwt: String,
 }
 
-
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+  name: String,
+  exp: usize
+}
 
 // async fn register_user(user: &User) -> Result<String, String> {
   // unsafe {
