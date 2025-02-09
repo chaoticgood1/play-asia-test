@@ -1,4 +1,5 @@
-use poem::{post, get, Response, Result};
+use poem::web::Path;
+use poem::{get, post, put, Response, Result};
 use poem::{handler, http::StatusCode, web::Json, Route, Error};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
@@ -9,11 +10,12 @@ use crate::ErrorResponse;
 
 pub fn route() -> Route {
   return Route::new()
-    .at("/items", post(create).get(get_items))
+    .at("/items", post(create_item).get(get_items))
+    .at("/items/:id", get(get_item))
 }
 
 #[handler]
-async fn create(item_req: Json<ItemReq>) -> Result<Response> {
+async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
   let data_str = match read_to_string(DATA_JSON) {
     Ok(res) => res,
     Err(_) => {
@@ -24,7 +26,7 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
     }
   };
 
-  let mut data: Vec<Value> = match from_str(&data_str) {
+  let mut items: Vec<Value> = match from_str(&data_str) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -34,14 +36,14 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
     }
   };
 
-  if !contains_item(&data, &item_req.name) {
+  if !contains_item(&items, &item_req.name) {
     let item = Item {
-      id: get_new_last_id(&data),
+      id: get_new_last_id(&items),
       name: item_req.name.to_string()
     };
 
-    data.push(json!(item));
-    let new_data_str = match serde_json::to_string_pretty(&data) {
+    items.push(json!(item));
+    let new_items_str = match serde_json::to_string_pretty(&items) {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -51,7 +53,7 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
       }
     };
 
-    match write(DATA_JSON, new_data_str.as_bytes()) {
+    match write(DATA_JSON, new_items_str.as_bytes()) {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -97,9 +99,59 @@ async fn get_items() -> Result<Response> {
   Ok(response_json(StatusCode::OK, &data))
 }
 
-fn contains_item(data: &Vec<Value>, name: &str) -> bool {
-  for data in data.iter() {
-    let n = match data.get("name").and_then(|n| n.as_str()) {
+
+#[handler]
+async fn get_item(id: Path<u64>) -> Result<Response> {
+  let data_str = match read_to_string(DATA_JSON) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error read 3".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+
+  let mut items: Vec<Value> = match from_str(&data_str) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error read 4".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+
+  for item in items.iter() {
+    let tmp_id = match item.get("id").and_then(|id| id.as_u64()) {
+      Some(res) => res,
+      None =>  {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error read 5".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    if tmp_id == *id {
+      return Ok(response_json(StatusCode::OK, item))
+    }
+    println!("item {:?}", tmp_id);
+  }
+
+  Err(error_response_json(StatusCode::NOT_FOUND, ErrorResponse {
+    error: "Not found".to_string(),
+    msg: "Item does not exist".to_string()
+  }))
+}
+
+
+
+
+
+fn contains_item(items: &Vec<Value>, name: &str) -> bool {
+  for item in items.iter() {
+    let n = match item.get("name").and_then(|n| n.as_str()) {
       Some(res) => res,
       None => return false,
     };
