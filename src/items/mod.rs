@@ -1,5 +1,5 @@
 use poem::web::Path;
-use poem::{get, post, put, Response, Result};
+use poem::{get, post, Response, Result};
 use poem::{handler, http::StatusCode, web::Json, Route, Error};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
@@ -10,17 +10,17 @@ use crate::ErrorResponse;
 
 pub fn route() -> Route {
   return Route::new()
-    .at("/items", post(create_item).get(get_items))
-    .at("/items/:id", get(get_item))
+    .at("/items", post(post_item).get(get_items))
+    .at("/items/:id", get(get_item).put(put_item))
 }
 
 #[handler]
-async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
+async fn post_item(item_req: Json<ItemReq>) -> Result<Response> {
   let data_str = match read_to_string(DATA_JSON) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error create 1".to_string(),
+        error: "Server error post_item 1".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -30,7 +30,7 @@ async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error create 2".to_string(),
+        error: "Server error post_item 2".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -47,7 +47,7 @@ async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error create 3".to_string(),
+          error: "Server error post_item 3".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -57,7 +57,7 @@ async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error create 4".to_string(),
+          error: "Server error post_item 4".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -67,20 +67,18 @@ async fn create_item(item_req: Json<ItemReq>) -> Result<Response> {
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
-    error: "Server error create 5".to_string(),
+    error: "Server error post_item 5".to_string(),
     msg: "Item already exists".to_string()
   }))
 }
 
 #[handler]
 async fn get_items() -> Result<Response> {
-  println!("get_items()");
-
   let data_str = match read_to_string(DATA_JSON) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error read 1".to_string(),
+        error: "Server error get_items 1".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -90,7 +88,7 @@ async fn get_items() -> Result<Response> {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error read 2".to_string(),
+        error: "Server error get_items 2".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -99,14 +97,13 @@ async fn get_items() -> Result<Response> {
   Ok(response_json(StatusCode::OK, &data))
 }
 
-
 #[handler]
 async fn get_item(id: Path<u64>) -> Result<Response> {
   let data_str = match read_to_string(DATA_JSON) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error read 3".to_string(),
+        error: "Server error get_item 1".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -116,7 +113,7 @@ async fn get_item(id: Path<u64>) -> Result<Response> {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error read 4".to_string(),
+        error: "Server error get_item 2".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -127,7 +124,7 @@ async fn get_item(id: Path<u64>) -> Result<Response> {
       Some(res) => res,
       None =>  {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error read 5".to_string(),
+          error: "Server error get_item 3".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -136,7 +133,6 @@ async fn get_item(id: Path<u64>) -> Result<Response> {
     if tmp_id == *id {
       return Ok(response_json(StatusCode::OK, item))
     }
-    println!("item {:?}", tmp_id);
   }
 
   Err(error_response_json(StatusCode::NOT_FOUND, ErrorResponse {
@@ -145,7 +141,115 @@ async fn get_item(id: Path<u64>) -> Result<Response> {
   }))
 }
 
+#[handler]
+async fn put_item(id: Path<u64>, item_req: Json<ItemReq>) -> Result<Response> {
+  let data_str = match read_to_string(DATA_JSON) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error put_item 1".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
 
+  let mut items: Vec<Value> = match from_str(&data_str) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error put_item 2".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+  
+  let mut updated_item_op = None;
+  for index in 0..items.iter().len() {
+    let mut item = match items.get_mut(index) {
+      Some(res) => res,
+      None => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error put_item 3".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    let tmp_id = match item.get("id").and_then(|id| id.as_u64()) {
+      Some(res) => res,
+      None =>  {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error put_item 4".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    if tmp_id == *id {
+      let mut update_item = match item.get_mut("name") {
+        Some(res) => res,
+        None => {
+          return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+            error: "Server error put_item 6".to_string(),
+            msg: "Please contact support".to_string()
+          }))
+        }
+      };
+
+      let name: &str = match update_item.as_str() {
+        Some(res) => res,
+        None => {
+          return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+            error: "Server error post_item 4".to_string(),
+            msg: "Please contact support".to_string()
+          }))
+        }
+      };
+
+      if name == item_req.name {
+        // NOTE: ChatGPT said this should be StatusCode::NO_CONTENT or OK
+        //        I chose OK so that there is a response body
+        return Ok(response_json(StatusCode::OK, item))
+      } else {
+        *update_item = json!(item_req.name);
+        updated_item_op = Some(update_item.clone());
+      }
+
+      
+      break;
+    }
+  }
+
+  if updated_item_op.is_some() {
+    let new_items_str = match serde_json::to_string_pretty(&items) {
+      Ok(res) => res,
+      Err(_e) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error post_item 5".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    match write(DATA_JSON, new_items_str.as_bytes()) {
+      Ok(res) => res,
+      Err(_e) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error post_item 6".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    }
+
+    let update_item = updated_item_op.unwrap();
+    return Ok(response_json(StatusCode::OK, update_item))
+  }
+  
+  Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
+    error: "Server error post_item 7".to_string(),
+    msg: "Item already exists".to_string()
+  }))
+}
 
 
 
