@@ -1,7 +1,6 @@
 use poem::{listener::TcpListener, Route, Server};
 use serde::{Serialize, Deserialize};
 
-
 mod users;
 mod items;
 
@@ -16,11 +15,17 @@ async fn main() -> Result<(), std::io::Error> {
     .await
 }
 
-
-
-
 #[derive(Serialize, Deserialize, Debug)]
 struct ErrorResponse {
   error: String,
   msg: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+  sub: String,
+  exp: usize
+}
+
+
+static SECRET_KEY: &str = "SuperSecretKey";

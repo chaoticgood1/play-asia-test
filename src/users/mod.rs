@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use once_cell::sync::Lazy;
 
-use crate::ErrorResponse;
+use crate::{Claims, ErrorResponse, SECRET_KEY};
 
 pub fn route() -> Route {
   return Route::new()
@@ -93,13 +93,13 @@ async fn login(login: Json<User>) -> Result<Json<serde_json::Value>> {
 
   Ok(Json(serde_json::json!({
     "msg": "Successfully logged in",
-    "jwt": create_jwt(&login.name)
+    "token": create_jwt(&login.name)
   })))
 }
 
 fn create_jwt(name: &str) -> String {
   let claims = Claims {
-    name: name.to_string(),
+    sub: name.to_string(),
     exp: (chrono::Utc::now() + chrono::Duration::days(1)).timestamp() as usize,
   };
 
@@ -127,8 +127,6 @@ static USERS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| {
   Mutex::new(mod_users)
 });
 
-const SECRET_KEY: &str = "SuperSecretKey";
-
 #[derive(Serialize, Deserialize, Debug)]
 struct User {
   name: String,
@@ -139,13 +137,6 @@ struct User {
 struct SignUpResponse {
   jwt: String,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-  name: String,
-  exp: usize
-}
-
 
 
 /*

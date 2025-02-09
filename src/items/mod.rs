@@ -1,22 +1,25 @@
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use poem::http::Method;
 use poem::web::Path;
-use poem::{get, post, Response, Result};
+use poem::{get, post, Endpoint, EndpointExt, IntoResponse, Middleware, Request, Response, Result};
 use poem::{handler, http::StatusCode, web::Json, Route, Error};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
 use std::fs::{read_to_string, write};
 
-use crate::ErrorResponse;
+use crate::{Claims, ErrorResponse, SECRET_KEY};
 
 
 pub fn route() -> Route {
-  return Route::new()
-    .at("/items", post(post_item)
-      .get(get_items)
-    )
+  let route = Route::new()
+    .at("/items", post(post_item).get(get_items).with(AuthMiddleware))
     .at("/items/:id", get(get_item)
       .put(put_item)
       .delete(delete_item)
-    )
+      .with(AuthMiddleware)
+    );
+
+  return route;
 }
 
 #[handler]
@@ -416,3 +419,91 @@ struct Item {
 struct ItemDeleted {
   message: String,
 }
+
+
+
+struct AuthMiddleware;
+
+impl<E: Endpoint> Middleware<E> for AuthMiddleware {
+  type Output = AuthMiddlewareImpl<E>;
+
+  fn transform(&self, ep: E) -> Self::Output {
+    AuthMiddlewareImpl(ep)
+  }
+}
+
+struct AuthMiddlewareImpl<E>(E);
+
+impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
+  type Output = Response;
+
+  async fn call(&self, req: Request) -> Result<Self::Output> {
+    if req.method() == Method::GET {
+      let res = self.0.call(req).await;
+
+      match res {
+        Ok(resp) => {
+          let resp = resp.into_response();
+          return Ok(resp)
+        }
+        Err(err) => {
+          println!("error: {err}");
+          return Err(err)
+        }
+      }
+    }
+
+    if let Some(auth_header) = req.headers().get("Authorization") {
+      if let Ok(auth_str) = auth_header.to_str() {
+        if auth_str.starts_with("Bearer ") {
+          let token = &auth_str[7..];
+
+          println!("token {:?}", token);
+
+          let key = DecodingKey::from_secret(SECRET_KEY.as_ref());
+          let mut validation = Validation::new(Algorithm::HS256);
+          validation.validate_exp = true; // Check expiration
+
+
+          if let Ok(claims) = decode::<Claims>(token, &key, &validation) {
+            // println!("claims {:?}", claims);
+            let res = self.0.call(req).await;
+
+            match res {
+              Ok(resp) => {
+                let resp = resp.into_response();
+                return Ok(resp)
+              }
+              Err(err) => {
+                println!("error: {err}");
+                return Err(err)
+              }
+            }
+          }
+
+          // Err(StatusCode::UNAUTHORIZED.into())
+        }
+      }
+    }
+
+
+    // println!("request: {}", req.uri().path());
+    // let res = self.0.call(req).await;
+
+    // match res {
+    //   Ok(resp) => {
+    //     // let resp = resp.into_response();
+    //     let resp = resp.into_response();
+    //     println!("response: {}", resp.status());
+    //     Ok(resp)
+    //   }
+    //   Err(err) => {
+    //     println!("error: {err}");
+    //     Err(err)
+    //   }
+    // }
+
+    Err(StatusCode::UNAUTHORIZED.into())
+  }
+}
+
