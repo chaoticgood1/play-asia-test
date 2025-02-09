@@ -37,10 +37,10 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
     }
   };
 
-  println!("items {:?}", data);
+  // println!("items {:?}", data);
   if !contains_item(&data, &item_req.name) {
     let item = Item {
-      id: get_last_id(&data),
+      id: get_new_last_id(&data),
       name: item_req.name.to_string()
     };
 
@@ -89,7 +89,7 @@ fn contains_item(data: &Vec<Value>, name: &str) -> bool {
   return false;
 }
 
-fn get_last_id(data: &Vec<Value>) -> u64 {
+fn get_new_last_id(data: &Vec<Value>) -> u64 {
   let mut highest_id = 1;
   for data in data.iter() {
     let n = match data.get("id").and_then(|n| n.as_u64()) {
@@ -97,10 +97,9 @@ fn get_last_id(data: &Vec<Value>) -> u64 {
       None => 1,
     };
 
-    if n > highest_id {
-      highest_id = n;
+    if n >= highest_id {
+      highest_id = n + 1;
     }
-    // println!("item {:?}", name);
   }
   highest_id
 }
