@@ -10,8 +10,13 @@ use crate::ErrorResponse;
 
 pub fn route() -> Route {
   return Route::new()
-    .at("/items", post(post_item).get(get_items))
-    .at("/items/:id", get(get_item).put(put_item))
+    .at("/items", post(post_item)
+      .get(get_items)
+    )
+    .at("/items/:id", get(get_item)
+      .put(put_item)
+      .delete(delete_item)
+    )
 }
 
 #[handler]
@@ -251,6 +256,90 @@ async fn put_item(id: Path<u64>, item_req: Json<ItemReq>) -> Result<Response> {
   }))
 }
 
+#[handler]
+async fn delete_item(id: Path<u64>) -> Result<Response> {
+  let data_str = match read_to_string(DATA_JSON) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error delete_item 1".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+
+  let mut items: Vec<Value> = match from_str(&data_str) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error delete_item 2".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+  
+  let mut has_deleted = false;
+  for index in 0..items.iter().len() {
+    let item = match items.get(index) {
+      Some(res) => res,
+      None => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error delete_item 3".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    let tmp_id = match item.get("id").and_then(|id| id.as_u64()) {
+      Some(res) => res,
+      None =>  {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error delete_item 4".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    if tmp_id == *id {
+      items.remove(index);
+      has_deleted = true;
+      break;
+    }
+  }
+
+  if has_deleted {
+    let new_items_str = match serde_json::to_string_pretty(&items) {
+      Ok(res) => res,
+      Err(_e) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error delete_item 5".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    match write(DATA_JSON, new_items_str.as_bytes()) {
+      Ok(res) => res,
+      Err(_e) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Server error delete_item 6".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    }
+
+    return Ok(response_json(StatusCode::OK, ItemDeleted {
+      message: "Item deleted successfully".to_string()
+    }))
+  }
+  
+  Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
+    error: "Server error delete_item 7".to_string(),
+    msg: "Item doesn't exist".to_string()
+  }))
+}
+
+
 
 
 fn contains_item(items: &Vec<Value>, name: &str) -> bool {
@@ -323,11 +412,7 @@ struct Item {
   name: String,
 }
 
-
-
-
-
-/*
-  TODO
-    CRUD for items
-*/
+#[derive(Serialize, Deserialize, Debug)]
+struct ItemDeleted {
+  message: String,
+}
