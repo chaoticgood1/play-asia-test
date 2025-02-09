@@ -1,11 +1,15 @@
-use poem::{get, handler, listener::TcpListener, web::Path, Route, Server};
+use poem::{listener::TcpListener, EndpointExt, Route, Server};
+use serde::{Serialize, Deserialize};
 
-mod user;
+
+mod users;
+mod items;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
   let app = Route::new()
-    .nest("/user", user::route());
+    .nest("/users", users::route())
+    .nest("/", items::route());
 
   Server::new(TcpListener::bind("0.0.0.0:3000"))
     .run(app)
@@ -15,19 +19,8 @@ async fn main() -> Result<(), std::io::Error> {
 
 
 
-
-
-
-/*
-  TODO:
-    Sign in
-    Log in
-    Log out
-    Login
-      user: Admin
-      pass: Admin
-    Logout
-
-*/
-
-
+#[derive(Serialize, Deserialize, Debug)]
+struct ErrorResponse {
+  error: String,
+  msg: String,
+}

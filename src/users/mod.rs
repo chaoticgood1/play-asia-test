@@ -1,9 +1,11 @@
-use std::{collections::HashMap, sync::Mutex, time::Duration};
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey};
+use std::{collections::HashMap, sync::Mutex};
+use jsonwebtoken::{encode, Header, EncodingKey};
 use poem::{handler, http::StatusCode, post, web::Json, Error, Response, Result, Route};
 use serde::{Serialize, Deserialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use once_cell::sync::Lazy;
+
+use crate::ErrorResponse;
 
 pub fn route() -> Route {
   return Route::new()
@@ -31,7 +33,7 @@ async fn sign_up(sign_up: Json<User>) -> Result<Json<serde_json::Value>> {
 
   let hashed_pass = match hash(sign_up.pass.clone(), DEFAULT_COST) {
     Ok(p) => p,
-    Err(e) => return Result::Err(
+    Err(_e) => return Result::Err(
       Error::from_response(
         Response::builder()
           .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -75,7 +77,7 @@ async fn login(login: Json<User>) -> Result<Json<serde_json::Value>> {
 
   match verify(login.pass.clone(), &hashed_pass) {
     Ok(res) => res,
-    Err(e) => return Result::Err(
+    Err(_e) => return Result::Err(
       Error::from_response(
         Response::builder()
           .status(StatusCode::UNAUTHORIZED)
@@ -95,7 +97,6 @@ async fn login(login: Json<User>) -> Result<Json<serde_json::Value>> {
   })))
 }
 
-
 fn create_jwt(name: &str) -> String {
   let claims = Claims {
     name: name.to_string(),
@@ -104,8 +105,6 @@ fn create_jwt(name: &str) -> String {
 
   encode(&Header::default(), &claims, &EncodingKey::from_secret(SECRET_KEY.as_ref())).unwrap()
 }
-
-
 
 
 static USERS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| {
@@ -137,12 +136,6 @@ struct User {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct ErrorResponse {
-  error: String,
-  msg: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 struct SignUpResponse {
   jwt: String,
 }
@@ -153,17 +146,22 @@ struct Claims {
   exp: usize
 }
 
-// async fn register_user(user: &User) -> Result<String, String> {
-  // unsafe {
-  //   if USERS.contains_key(&user.username) {
-  //     return Err("Username already taken".to_string());
-  //   }
 
-  //   let hashed_password = hash_password(&user.password).unwrap();
-  //   USERS.insert(user.username.clone(), hashed_password);
 
-  //   Ok("User registered successfully".to_string())
-  // }
+/*
+  TODO:
+    Sign in
+    Log in
+    Log out
+    Login
+      user: Admin
+      pass: Admin
+    Logout
 
-  // return Result::Err(Error::from_string("In progress", StatusCode::BAD_REQUEST));
-// }
+    Verify all of these
+    Create tests
+      Unit
+      Component (Might not needed)
+      End to end? (Priority, since this is just a small app)
+
+*/
