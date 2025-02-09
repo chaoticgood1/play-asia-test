@@ -1,11 +1,8 @@
 use poem::{post, get, Response, Result};
 use poem::{handler, http::StatusCode, web::Json, Route, Error};
 use serde::{Serialize, Deserialize};
-use serde_json::{from_reader, from_str, json, Value};
-
-use std::{env, path::PathBuf};
-use std::fs::{read_to_string, write, File, OpenOptions};
-use std::io::{BufReader, Read, Write};
+use serde_json::{from_str, json, Value};
+use std::fs::{read_to_string, write};
 
 use crate::ErrorResponse;
 
@@ -37,7 +34,6 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
     }
   };
 
-  // println!("items {:?}", data);
   if !contains_item(&data, &item_req.name) {
     let item = Item {
       id: get_new_last_id(&data),
@@ -69,9 +65,36 @@ async fn create(item_req: Json<ItemReq>) -> Result<Response> {
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
-    error: "Request Error".to_string(),
+    error: "Server error create 5".to_string(),
     msg: "Item already exists".to_string()
   }))
+}
+
+#[handler]
+async fn get_items() -> Result<Response> {
+  println!("get_items()");
+
+  let data_str = match read_to_string(DATA_JSON) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error read 1".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+
+  let mut data: Vec<Value> = match from_str(&data_str) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error read 2".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+
+  Ok(response_json(StatusCode::OK, &data))
 }
 
 fn contains_item(data: &Vec<Value>, name: &str) -> bool {
@@ -128,61 +151,6 @@ where
       )
   )
 }
-
-
-#[handler]
-async fn get_items() -> Result<Json<Vec<Value>>> {
-  println!("get_items()");
-  // let path = get_file_path();
-  // if path.is_none() {
-  //   return Result::Err(
-  //     Error::from_response(
-  //       Response::builder()
-  //         .status(StatusCode::CONFLICT)
-  //         .header("Content-Type", "application/json")
-  //         .body(serde_json::to_string(&ErrorResponse {
-  //           error: "Path doesn't exist".to_string(),
-  //           msg: "Please use different credentials".to_string()
-  //         })
-  //         .unwrap())
-  //     )
-  //   )
-  // }
-
-  let temp_items = vec![
-    serde_json::json!({"id": "1", "name": "Rust Programming Book"}),
-    serde_json::json!({"id": "2", "name": "Web Development with Rust"}),
-  ];
-
-
-  Ok(Json(temp_items))
-}
-
-// #[handler]
-// async fn get_items(item: Json<Item>) -> Result<Vec<Json<serde_json::Value>>> {
-//   println!("get_items()");
-
-
-//   let path = get_file_path();
-//   if path.is_none() {
-//     return Result::Err(
-//       Error::from_response(
-//         Response::builder()
-//           .status(StatusCode::CONFLICT)
-//           .header("Content-Type", "application/json")
-//           .body(serde_json::to_string(&ErrorResponse {
-//             error: "Path doesn't exist".to_string(),
-//             msg: "Please use different credentials".to_string()
-//           })
-//           .unwrap())
-//       )
-//     )
-//   }
-
-//   Ok(Json(serde_json::json!({
-//     "msg": "Successfully created item"
-//   })))
-// }
 
 
 static DATA_JSON: &str = "data.json";
