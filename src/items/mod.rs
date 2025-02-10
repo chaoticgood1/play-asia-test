@@ -5,7 +5,6 @@ use poem::{get, post, Endpoint, EndpointExt, IntoResponse, Middleware, Request, 
 use poem::{handler, http::StatusCode, web::Json, Route};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
-use std::error::Error;
 use std::fs::{read_to_string, write, OpenOptions};
 use std::io::Write;
 use std::sync::Arc;
@@ -71,7 +70,7 @@ async fn post_item(
 }
 
 #[handler]
-async fn get_items(req: &Request, data_path: Data<&String>) -> Result<Response> {
+async fn get_items(req: &Request) -> Result<Response> {
   // Error handling on this already in AuthMiddleware
   let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
 
@@ -79,7 +78,7 @@ async fn get_items(req: &Request, data_path: Data<&String>) -> Result<Response> 
 }
 
 #[handler]
-async fn get_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
+async fn get_item(req: &Request, id: Path<u64>) -> Result<Response> {
   // Error handling on this already in AuthMiddleware
   let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
 

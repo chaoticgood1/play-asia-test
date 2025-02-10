@@ -171,6 +171,30 @@ async fn test_get_items_no_item() {
 }
 
 #[tokio::test]
+async fn test_get_items_using_id() {
+  let data_path = "test_get_items_using_id.json".to_string();
+  delete_file_if_exists(&data_path);
+
+  let items: Vec<Item> = vec![
+    Item { id: 1, name: "Item1".to_string() },
+    Item { id: 2, name: "Item2".to_string() },
+  ];
+
+  create_data(data_path.clone(), &items);
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let res = client.get("/items/1").send().await;
+  res.assert_status(StatusCode::OK);
+  res.assert_json(json!({
+    "id": 1, "name": "Item1"
+  })).await;
+
+  delete_file_if_exists(&data_path);
+}
+
+
+#[tokio::test]
 async fn test_get_items_with_items() {
   let data_path = "test_get_items_with_items.json".to_string();
   delete_file_if_exists(&data_path);
