@@ -24,21 +24,35 @@ pub fn route() -> Route {
 
 #[handler]
 async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
+  println!("item_req {:?}", item_req);
+
+  if let Err(_) = ensure_file_exists(&data_path) {
+    return Err(error_response_json(
+      StatusCode::INTERNAL_SERVER_ERROR,
+      ErrorResponse {
+          error: "Server error post_item 1".to_string(),
+          msg: "Please contact support".to_string(),
+      },
+    ));
+  }
+
   let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error post_item 1".to_string(),
+        error: "Server error post_item 2".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
   };
 
+  println!("data_str {:?}", data_str);
+
   let mut items: Vec<Value> = match from_str(&data_str) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error post_item 2".to_string(),
+        error: "Server error post_item 3".to_string(),
         msg: "Please contact support".to_string()
       }))
     }
@@ -55,7 +69,7 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error post_item 3".to_string(),
+          error: "Server error post_item 4".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -65,7 +79,7 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error post_item 4".to_string(),
+          error: "Server error post_item 5".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -75,7 +89,7 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
-    error: "Server error post_item 5".to_string(),
+    error: "Server error post_item 6".to_string(),
     msg: "Item already exists".to_string()
   }))
 }
@@ -480,10 +494,10 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
             match res {
               Ok(resp) => {
                 let resp = resp.into_response();
-                println!("{:?}", resp);
                 return Ok(resp)
               }
               Err(err) => {
+                // println!("err {:?}", err);
                 return Err(err.status().into())
               }
             }
@@ -492,6 +506,7 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
       }
     }
 
+    // println!("Unauthorized");
     Err(StatusCode::UNAUTHORIZED.into())
   }
 }

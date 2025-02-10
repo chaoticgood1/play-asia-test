@@ -1,12 +1,70 @@
 use std::{fs::{remove_file, OpenOptions}, io::Write};
-
 use play_asia::{all_routes, items::Item};
 use poem::{http::StatusCode, test::TestClient};
 use serde_json::{json, to_string_pretty};
 
+
+#[tokio::test]
+async fn test_post_item_no_jwt_in_header() {
+  let data_path = "test_post_item_no_jwt_in_header.json".to_string();
+  delete_file_if_exists(&data_path);
+
+  let items: Vec<Item> = vec![];
+  create_data(data_path.clone(), &items);
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let res = client
+    .post("/items")
+    .body_json(&json!({
+      "name": "NewItem"
+    }))
+    .send()
+    .await;
+
+  res.assert_status(StatusCode::UNAUTHORIZED);
+
+  delete_file_if_exists(&data_path);
+}
+
+
+// FIXME: Unauthorized issue due to jwt
+#[tokio::test]
+async fn test_post_item_one_item() {
+  let data_path = "test_post_item_one_item.json".to_string();
+  delete_file_if_exists(&data_path);
+
+  let items: Vec<Item> = vec![];
+  create_data(data_path.clone(), &items);
+
+  println!("1");
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  println!("2");
+  let res = client
+    .post("/items")
+    .body_json(&json!({
+      "name": "NewItem"
+    }))
+    .send()
+    .await;
+
+  println!("3");
+  res.assert_status(StatusCode::OK);
+
+  res.assert_json(json!(vec![
+    Item { id: 1, name: "NewItem".to_string() }
+  ])).await;
+
+  delete_file_if_exists(&data_path);
+}
+
+
+
 #[tokio::test]
 async fn test_get_items_no_item() {
-  let data_path = "data_test1.json".to_string();
+  let data_path = "test_get_items_no_item.json".to_string();
   delete_file_if_exists(&data_path);
 
   let items: Vec<Item> = vec![];
@@ -23,7 +81,7 @@ async fn test_get_items_no_item() {
 
 #[tokio::test]
 async fn test_get_items_with_items() {
-  let data_path = "data_test2.json".to_string();
+  let data_path = "test_get_items_with_items.json".to_string();
   delete_file_if_exists(&data_path);
 
   let items: Vec<Item> = vec![
