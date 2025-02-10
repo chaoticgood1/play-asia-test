@@ -1,12 +1,12 @@
 use std::{fs::{remove_file, OpenOptions}, io::Write};
-use play_asia::{all_routes, items::Item};
-use poem::{http::StatusCode, test::TestClient};
+use play_asia::{all_routes, items::Item, users::LoginResponse};
+use poem::{http::{header, StatusCode}, test::TestClient};
 use serde_json::{json, to_string_pretty};
 
 
 #[tokio::test]
-async fn test_post_item_no_jwt_in_header() {
-  let data_path = "test_post_item_no_jwt_in_header.json".to_string();
+async fn test_post_item_no_jwt() {
+  let data_path = "test_post_item_no_jwt.json".to_string();
   delete_file_if_exists(&data_path);
 
   let items: Vec<Item> = vec![];
@@ -26,6 +26,51 @@ async fn test_post_item_no_jwt_in_header() {
 
   delete_file_if_exists(&data_path);
 }
+
+
+
+#[tokio::test]
+async fn test_post_item_with_jwt() {
+  // Login user: admin1 ps: admin1
+  let data_path = "test_post_item_with_jwt.json".to_string();
+  delete_file_if_exists(&data_path);
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+
+  let mut login_req = client
+    .post("/users/login")
+    .body_json(&json!({
+      "name": "admin1",
+      "pass": "admin1"
+    }))
+    .send()
+    .await;
+
+  let login_body = login_req.0.take_body().into_json::<LoginResponse>().await.unwrap();
+
+  let items: Vec<Item> = vec![];
+  create_data(data_path.clone(), &items);
+
+  let res = client
+    .post("/items")
+    .header(header::AUTHORIZATION, format!("Bearer {}", login_body.token))
+    .body_json(&json!({
+      "name": "NewItem"
+    }))
+    .send()
+    .await;
+  
+
+  res.assert_status(StatusCode::CREATED);
+  res.assert_json(json!(
+    {
+      "id": 1,
+      "name": "NewItem"
+    }
+  )).await;
+  delete_file_if_exists(&data_path);
+}
+
 
 
 // FIXME: Unauthorized issue due to jwt

@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use once_cell::sync::Lazy;
 
-use crate::{Claims, ErrorResponse, SECRET_KEY};
+use crate::{error_response_json, response_json, Claims, ErrorResponse, SECRET_KEY};
 
 pub fn route() -> Route {
   return Route::new()
@@ -55,46 +55,36 @@ async fn sign_up(sign_up: Json<User>) -> Result<Json<serde_json::Value>> {
 }
 
 #[handler]
-async fn login(login: Json<User>) -> Result<Json<serde_json::Value>> {
+async fn login(login: Json<User>) -> Result<Response> {
   let mut users = USERS.lock().unwrap();
 
   let hashed_pass = match users.get(&login.name) {
     Some(u) => u,
-    None => return Result::Err(
-      Error::from_response(
-        Response::builder()
-          .status(StatusCode::UNAUTHORIZED)
-          .header("Content-Type", "application/json")
-          .body(serde_json::to_string(&ErrorResponse {
+    None => return Err(error_response_json(
+        StatusCode::UNAUTHORIZED,
+        ErrorResponse {
             error: "User not found".to_string(),
-            msg: "The user doesn't exist".to_string()
-          })
-          .unwrap())
-      )
-    )
+            msg: "The user doesn't exist".to_string(),
+        },
+      ))
   };
 
 
   match verify(login.pass.clone(), &hashed_pass) {
     Ok(res) => res,
-    Err(_e) => return Result::Err(
-      Error::from_response(
-        Response::builder()
-          .status(StatusCode::UNAUTHORIZED)
-          .header("Content-Type", "application/json")
-          .body(serde_json::to_string(&ErrorResponse {
-            error: "Invalid credentials".to_string(),
-            msg: "Wrong username or password".to_string()
-          })
-          .unwrap())
-      )
-    )
+    Err(_e) => return Err(error_response_json(
+      StatusCode::UNAUTHORIZED,
+      ErrorResponse {
+          error: "Invalid credentials".to_string(),
+          msg: "Wrong username or password".to_string(),
+      },
+    ))
   };
 
-  Ok(Json(serde_json::json!({
-    "msg": "Successfully logged in",
-    "token": create_jwt(&login.name)
-  })))
+  Ok(response_json(StatusCode::OK, LoginResponse {
+    msg: "Successfully logged in".to_string(),
+    token: create_jwt(&login.name)
+  }))
 }
 
 fn create_jwt(name: &str) -> String {
@@ -109,8 +99,8 @@ fn create_jwt(name: &str) -> String {
 
 static USERS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| {
   let mut users = HashMap::new();
-  users.insert("user1".to_string(), "pass1".to_string());
-  users.insert("user2".to_string(), "pass2".to_string());
+  users.insert("admin1".to_string(), "admin1".to_string());
+  users.insert("admin2".to_string(), "admin2".to_string());
 
   let mut mod_users = HashMap::new();
   for (name, pass) in users.iter() {
@@ -129,13 +119,19 @@ static USERS: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct User {
-  name: String,
-  pass: String,
+  pub name: String,
+  pub pass: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SignUpResponse {
   jwt: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoginResponse {
+  pub msg: String,
+  pub token: String,
 }
 
 

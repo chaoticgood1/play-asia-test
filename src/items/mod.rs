@@ -2,13 +2,13 @@ use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use poem::http::Method;
 use poem::web::{Data, Path};
 use poem::{get, post, Endpoint, EndpointExt, IntoResponse, Middleware, Request, Response, Result};
-use poem::{handler, http::StatusCode, web::Json, Route, Error};
+use poem::{handler, http::StatusCode, web::Json, Route};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
 use std::fs::{read_to_string, write, OpenOptions};
 use std::io::Write;
 
-use crate::{Claims, ErrorResponse, SECRET_KEY};
+use crate::{error_response_json, response_json, Claims, ErrorResponse, SECRET_KEY};
 
 pub fn route() -> Route {
   let route = Route::new()
@@ -24,8 +24,6 @@ pub fn route() -> Route {
 
 #[handler]
 async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
-  println!("item_req {:?}", item_req);
-
   if let Err(_) = ensure_file_exists(&data_path) {
     return Err(error_response_json(
       StatusCode::INTERNAL_SERVER_ERROR,
@@ -45,8 +43,6 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
       }))
     }
   };
-
-  println!("data_str {:?}", data_str);
 
   let mut items: Vec<Value> = match from_str(&data_str) {
     Ok(res) => res,
@@ -75,7 +71,7 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
       }
     };
 
-    match write(DATA_JSON, new_items_str.as_bytes()) {
+    match write(data_path.as_str(), new_items_str.as_bytes()) {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -264,7 +260,7 @@ async fn put_item(id: Path<u64>, item_req: Json<ItemReq>, data_path: Data<&Strin
       }
     };
 
-    match write(DATA_JSON, new_items_str.as_bytes()) {
+    match write(data_path.as_str(), new_items_str.as_bytes()) {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -346,7 +342,7 @@ async fn delete_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response
       }
     };
 
-    match write(DATA_JSON, new_items_str.as_bytes()) {
+    match write(data_path.as_str(), new_items_str.as_bytes()) {
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -399,34 +395,6 @@ fn get_new_last_id(data: &Vec<Value>) -> u64 {
   }
   highest_id
 }
-
-
-fn response_json<T>(status_code: StatusCode, data: T) -> Response
-where
-  T: Serialize
-{
-  Response::builder()
-    .status(status_code)
-    .header("Content-Type", "application/json")
-    .body(serde_json::to_string(&data)
-    .unwrap())
-}
-
-fn error_response_json<T>(status_code: StatusCode, data: T) -> Error
-where
-  T: Serialize
-{
-  Error::from_response(
-    Response::builder()
-      .status(status_code)
-      .header("Content-Type", "application/json")
-        .body(serde_json::to_string(&data).unwrap()
-      )
-  )
-}
-
-
-static DATA_JSON: &str = "data.json";
 
 
 #[derive(Serialize, Deserialize, Debug)]
