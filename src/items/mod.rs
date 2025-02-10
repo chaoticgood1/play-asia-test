@@ -208,7 +208,7 @@ async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> 
       Some(res) => res,
       None => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error delete_item 3".to_string(),
+          error: "Server error delete_item 1".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -218,7 +218,7 @@ async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> 
       Some(res) => res,
       None =>  {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error delete_item 4".to_string(),
+          error: "Server error delete_item 2".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -236,7 +236,7 @@ async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> 
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error delete_item 5".to_string(),
+          error: "Server error delete_item 3".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -246,7 +246,7 @@ async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> 
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error delete_item 6".to_string(),
+          error: "Server error delete_item 4".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -258,7 +258,7 @@ async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> 
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
-    error: "Server error delete_item 7".to_string(),
+    error: "Server error delete_item 5".to_string(),
     msg: "Item doesn't exist".to_string()
   }))
 }
