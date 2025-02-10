@@ -7,7 +7,9 @@ pub mod items;
 pub fn all_routes(data_path: String) -> Route {
   Route::new()
     .nest("/users", users::route())
-    .nest("/", items::route().data(data_path.clone()))
+    .nest("/", items::route(data_path.clone())
+      .data(data_path.clone())
+    )
 }
 
 fn response_json<T>(status_code: StatusCode, data: T) -> Response

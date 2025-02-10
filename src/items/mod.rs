@@ -10,13 +10,16 @@ use std::io::Write;
 
 use crate::{error_response_json, response_json, Claims, ErrorResponse, SECRET_KEY};
 
-pub fn route() -> Route {
+pub fn route(data_path: String) -> Route {
   let route = Route::new()
-    .at("/items", post(post_item).get(get_items).with(AuthMiddleware))
+    .at("/items", post(post_item)
+      .get(get_items)
+      .with(AuthMiddleware::new(data_path.clone()))
+    )
     .at("/items/:id", get(get_item)
       .put(put_item)
       .delete(delete_item)
-      .with(AuthMiddleware)
+      .with(AuthMiddleware::new(data_path.clone()))
     );
 
   return route;
@@ -24,16 +27,6 @@ pub fn route() -> Route {
 
 #[handler]
 async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
-  if let Err(_) = ensure_file_exists(&data_path) {
-    return Err(error_response_json(
-      StatusCode::INTERNAL_SERVER_ERROR,
-      ErrorResponse {
-          error: "Server error post_item 1".to_string(),
-          msg: "Please contact support".to_string(),
-      },
-    ));
-  }
-
   let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
@@ -92,16 +85,6 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
 
 #[handler]
 async fn get_items(data_path: Data<&String>) -> Result<Response> {
-  if let Err(_) = ensure_file_exists(&data_path) {
-    return Err(error_response_json(
-      StatusCode::INTERNAL_SERVER_ERROR,
-      ErrorResponse {
-          error: "Server error get_items 1".to_string(),
-          msg: "Please contact support".to_string(),
-      },
-    ));
-  }
-
   let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
@@ -415,24 +398,38 @@ struct ItemDeleted {
 
 
 
-struct AuthMiddleware;
+struct AuthMiddleware {
+  data_path: String
+}
+
+impl AuthMiddleware {
+  pub fn new(data_path: String) -> Self {
+    Self { data_path }
+  }
+}
 
 impl<E: Endpoint> Middleware<E> for AuthMiddleware {
   type Output = AuthMiddlewareImpl<E>;
 
   fn transform(&self, ep: E) -> Self::Output {
-    AuthMiddlewareImpl(ep)
+    AuthMiddlewareImpl {
+      inner: ep,
+      data_path: self.data_path.clone()
+    }
   }
 }
 
-struct AuthMiddlewareImpl<E>(E);
+struct AuthMiddlewareImpl<E> {
+  inner: E,
+  data_path: String,
+}
 
 impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
   type Output = Response;
 
   async fn call(&self, req: Request) -> Result<Self::Output> {
     if req.method() == Method::GET {
-      let res = self.0.call(req).await;
+      let res = self.inner.call(req).await;
 
       match res {
         Ok(resp) => {
@@ -457,7 +454,7 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
 
           if let Ok(_claims) = decode::<Claims>(token, &key, &validation) {
             // println!("claims {:?}", claims);
-            let res = self.0.call(req).await;
+            let res = self.inner.call(req).await;
 
             match res {
               Ok(resp) => {
@@ -472,6 +469,19 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
           }
         }
       }
+    }
+
+    // println!("Middleware - Data Path: {:?}", self.data_path);
+
+    if let Err(_) = ensure_file_exists(&self.data_path) {
+      // NOTE: Should be addressed internally, can't expose error outside
+      return Err(error_response_json(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        ErrorResponse {
+            error: "Server error post_item 1".to_string(),
+            msg: "Please contact support".to_string(),
+        },
+      ));
     }
 
     // println!("Unauthorized");
