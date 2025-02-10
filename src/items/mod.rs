@@ -1,14 +1,14 @@
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use poem::http::Method;
-use poem::web::Path;
+use poem::web::{Data, Path};
 use poem::{get, post, Endpoint, EndpointExt, IntoResponse, Middleware, Request, Response, Result};
 use poem::{handler, http::StatusCode, web::Json, Route, Error};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
-use std::fs::{read_to_string, write};
+use std::fs::{read_to_string, write, OpenOptions};
+use std::io::Write;
 
 use crate::{Claims, ErrorResponse, SECRET_KEY};
-
 
 pub fn route() -> Route {
   let route = Route::new()
@@ -23,8 +23,8 @@ pub fn route() -> Route {
 }
 
 #[handler]
-async fn post_item(item_req: Json<ItemReq>) -> Result<Response> {
-  let data_str = match read_to_string(DATA_JSON) {
+async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
+  let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -81,18 +81,18 @@ async fn post_item(item_req: Json<ItemReq>) -> Result<Response> {
 }
 
 #[handler]
-async fn get_items() -> Result<Response> {
-  let data_str = match read_to_string(DATA_JSON) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error get_items 1".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn get_items(data_path: Data<&String>) -> Result<Response> {
+  if let Err(_) = ensure_file_exists(&data_path) {
+    return Err(error_response_json(
+      StatusCode::INTERNAL_SERVER_ERROR,
+      ErrorResponse {
+          error: "Server error get_items 1".to_string(),
+          msg: "Please contact support".to_string(),
+      },
+    ));
+  }
 
-  let mut data: Vec<Value> = match from_str(&data_str) {
+  let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -102,12 +102,23 @@ async fn get_items() -> Result<Response> {
     }
   };
 
+  let mut data: Vec<Value> = match from_str(&data_str) {
+    Ok(res) => res,
+    Err(_) => {
+      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+        error: "Server error get_items 3".to_string(),
+        msg: "Please contact support".to_string()
+      }))
+    }
+  };
+  // println!("data {:?}", data);
+
   Ok(response_json(StatusCode::OK, &data))
 }
 
 #[handler]
-async fn get_item(id: Path<u64>) -> Result<Response> {
-  let data_str = match read_to_string(DATA_JSON) {
+async fn get_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
+  let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -150,8 +161,8 @@ async fn get_item(id: Path<u64>) -> Result<Response> {
 }
 
 #[handler]
-async fn put_item(id: Path<u64>, item_req: Json<ItemReq>) -> Result<Response> {
-  let data_str = match read_to_string(DATA_JSON) {
+async fn put_item(id: Path<u64>, item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
+  let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -260,8 +271,8 @@ async fn put_item(id: Path<u64>, item_req: Json<ItemReq>) -> Result<Response> {
 }
 
 #[handler]
-async fn delete_item(id: Path<u64>) -> Result<Response> {
-  let data_str = match read_to_string(DATA_JSON) {
+async fn delete_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
+  let data_str = match read_to_string(data_path.as_str()) {
     Ok(res) => res,
     Err(_) => {
       return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -410,9 +421,9 @@ struct ItemReq {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Item {
-  id: u64,
-  name: String,
+pub struct Item {
+  pub id: u64,
+  pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -458,52 +469,41 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
         if auth_str.starts_with("Bearer ") {
           let token = &auth_str[7..];
 
-          println!("token {:?}", token);
-
           let key = DecodingKey::from_secret(SECRET_KEY.as_ref());
           let mut validation = Validation::new(Algorithm::HS256);
           validation.validate_exp = true; // Check expiration
 
-
-          if let Ok(claims) = decode::<Claims>(token, &key, &validation) {
+          if let Ok(_claims) = decode::<Claims>(token, &key, &validation) {
             // println!("claims {:?}", claims);
             let res = self.0.call(req).await;
 
             match res {
               Ok(resp) => {
                 let resp = resp.into_response();
+                println!("{:?}", resp);
                 return Ok(resp)
               }
               Err(err) => {
-                println!("error: {err}");
-                return Err(err)
+                return Err(err.status().into())
               }
             }
           }
-
-          // Err(StatusCode::UNAUTHORIZED.into())
         }
       }
     }
-
-
-    // println!("request: {}", req.uri().path());
-    // let res = self.0.call(req).await;
-
-    // match res {
-    //   Ok(resp) => {
-    //     // let resp = resp.into_response();
-    //     let resp = resp.into_response();
-    //     println!("response: {}", resp.status());
-    //     Ok(resp)
-    //   }
-    //   Err(err) => {
-    //     println!("error: {err}");
-    //     Err(err)
-    //   }
-    // }
 
     Err(StatusCode::UNAUTHORIZED.into())
   }
 }
 
+
+fn ensure_file_exists(path: &str) -> std::io::Result<()> {
+  if !std::path::Path::new(path).exists() {
+    let mut file = OpenOptions::new()
+      .write(true)
+      .create(true)
+      .open(path)?;
+    file.write(b"[]")?;
+  }
+  Ok(())
+}
