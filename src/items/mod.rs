@@ -5,47 +5,34 @@ use poem::{get, post, Endpoint, EndpointExt, IntoResponse, Middleware, Request, 
 use poem::{handler, http::StatusCode, web::Json, Route};
 use serde::{Serialize, Deserialize};
 use serde_json::{from_str, json, Value};
+use std::error::Error;
 use std::fs::{read_to_string, write, OpenOptions};
 use std::io::Write;
+use std::sync::Arc;
 
 use crate::{error_response_json, response_json, Claims, ErrorResponse, SECRET_KEY};
 
 pub fn route(data_path: String) -> Route {
-  let route = Route::new()
+  Route::new()
     .at("/items", post(post_item)
       .get(get_items)
-      .with(AuthMiddleware::new(data_path.clone()))
+      .with(AuthMiddleware::new(data_path.clone().into()))
     )
     .at("/items/:id", get(get_item)
       .put(put_item)
       .delete(delete_item)
-      .with(AuthMiddleware::new(data_path.clone()))
-    );
-
-  return route;
+      .with(AuthMiddleware::new(data_path.clone().into()))
+    )
 }
 
 #[handler]
-async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
-  let data_str = match read_to_string(data_path.as_str()) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error post_item 2".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
-
-  let mut items: Vec<Value> = match from_str(&data_str) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error post_item 3".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn post_item(
+  req: &Request, 
+  item_req: Json<ItemReq>, 
+  data_path: Data<&String>
+) -> Result<Response> {
+  // Error handling on this already in AuthMiddleware
+  let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
 
   if !contains_item(&items, &item_req.name) {
     let item = Item {
@@ -84,52 +71,17 @@ async fn post_item(item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<
 }
 
 #[handler]
-async fn get_items(data_path: Data<&String>) -> Result<Response> {
-  let data_str = match read_to_string(data_path.as_str()) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error get_items 2".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn get_items(req: &Request, data_path: Data<&String>) -> Result<Response> {
+  // Error handling on this already in AuthMiddleware
+  let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
 
-  let mut data: Vec<Value> = match from_str(&data_str) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error get_items 3".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
-  // println!("data {:?}", data);
-
-  Ok(response_json(StatusCode::OK, &data))
+  Ok(response_json(StatusCode::OK, &items))
 }
 
 #[handler]
-async fn get_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
-  let data_str = match read_to_string(data_path.as_str()) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error get_item 1".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
-
-  let mut items: Vec<Value> = match from_str(&data_str) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error get_item 2".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn get_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
+  // Error handling on this already in AuthMiddleware
+  let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
 
   for item in items.iter() {
     let tmp_id = match item.get("id").and_then(|id| id.as_u64()) {
@@ -154,26 +106,9 @@ async fn get_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
 }
 
 #[handler]
-async fn put_item(id: Path<u64>, item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
-  let data_str = match read_to_string(data_path.as_str()) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error put_item 1".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
-
-  let mut items: Vec<Value> = match from_str(&data_str) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error put_item 2".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_path: Data<&String>) -> Result<Response> {
+  // Error handling on this already in AuthMiddleware
+  let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
   
   let mut updated_item_op = None;
   for index in 0..items.iter().len() {
@@ -264,26 +199,9 @@ async fn put_item(id: Path<u64>, item_req: Json<ItemReq>, data_path: Data<&Strin
 }
 
 #[handler]
-async fn delete_item(id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
-  let data_str = match read_to_string(data_path.as_str()) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error delete_item 1".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
-
-  let mut items: Vec<Value> = match from_str(&data_str) {
-    Ok(res) => res,
-    Err(_) => {
-      return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-        error: "Server error delete_item 2".to_string(),
-        msg: "Please contact support".to_string()
-      }))
-    }
-  };
+async fn delete_item(req: &Request, id: Path<u64>, data_path: Data<&String>) -> Result<Response> {
+  // Error handling on this already in AuthMiddleware
+  let mut items = req.extensions().get::<Vec<Value>>().unwrap().clone();
   
   let mut has_deleted = false;
   for index in 0..items.iter().len() {
@@ -399,11 +317,11 @@ struct ItemDeleted {
 
 
 struct AuthMiddleware {
-  data_path: String
+  data_path: Arc<String>
 }
 
 impl AuthMiddleware {
-  pub fn new(data_path: String) -> Self {
+  pub fn new(data_path: Arc<String>) -> Self {
     Self { data_path }
   }
 }
@@ -421,13 +339,47 @@ impl<E: Endpoint> Middleware<E> for AuthMiddleware {
 
 struct AuthMiddlewareImpl<E> {
   inner: E,
-  data_path: String,
+  data_path: Arc<String>,
 }
 
 impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
   type Output = Response;
 
-  async fn call(&self, req: Request) -> Result<Self::Output> {
+  async fn call(&self, mut req: Request) -> Result<Self::Output> {
+    if let Err(_) = ensure_file_exists(&self.data_path) {
+      // NOTE: Should be addressed internally, can't expose error outside
+      return Err(error_response_json(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        ErrorResponse {
+          error: format!("Error creating {}", self.data_path),
+          msg: "Please contact support".to_string(),
+        },
+      ));
+    }
+
+    // File if exists
+    let data_str = match read_to_string(self.data_path.as_str()) {
+      Ok(res) => res,
+      Err(_) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Error reading data.json".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+
+    // File if can be parsed to items
+    let items: Vec<Value> = match from_str(&data_str) {
+      Ok(res) => res,
+      Err(_) => {
+        return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
+          error: "Error parsing data.json".to_string(),
+          msg: "Please contact support".to_string()
+        }))
+      }
+    };
+    req.extensions_mut().insert(items);
+
     if req.method() == Method::GET {
       let res = self.inner.call(req).await;
 
@@ -453,17 +405,14 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
           validation.validate_exp = true; // Check expiration
 
           if let Ok(_claims) = decode::<Claims>(token, &key, &validation) {
-            // println!("claims {:?}", claims);
             let res = self.inner.call(req).await;
-
             match res {
               Ok(resp) => {
                 let resp = resp.into_response();
                 return Ok(resp)
               }
               Err(err) => {
-                // println!("err {:?}", err);
-                return Err(err.status().into())
+                return Err(err)
               }
             }
           }
@@ -471,20 +420,6 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
       }
     }
 
-    // println!("Middleware - Data Path: {:?}", self.data_path);
-
-    if let Err(_) = ensure_file_exists(&self.data_path) {
-      // NOTE: Should be addressed internally, can't expose error outside
-      return Err(error_response_json(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        ErrorResponse {
-            error: "Server error post_item 1".to_string(),
-            msg: "Please contact support".to_string(),
-        },
-      ));
-    }
-
-    // println!("Unauthorized");
     Err(StatusCode::UNAUTHORIZED.into())
   }
 }
