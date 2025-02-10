@@ -132,7 +132,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
     };
 
     if tmp_id == *id {
-      let mut update_item = match item.get_mut("name") {
+      let mut update_name = match item.get_mut("name") {
         Some(res) => res,
         None => {
           return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -142,7 +142,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
         }
       };
 
-      let name: &str = match update_item.as_str() {
+      let name: &str = match update_name.as_str() {
         Some(res) => res,
         None => {
           return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
@@ -157,8 +157,8 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
         //        I chose OK so that there is a response body
         return Ok(response_json(StatusCode::OK, item))
       } else {
-        *update_item = json!(item_req.name);
-        updated_item_op = Some(update_item.clone());
+        *update_name = json!(item_req.name);
+        updated_item_op = Some(item.clone());
       }
 
       
@@ -187,8 +187,8 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
       }
     }
 
-    let update_item = updated_item_op.unwrap();
-    return Ok(response_json(StatusCode::OK, update_item))
+    let newly_updated = updated_item_op.unwrap();
+    return Ok(response_json(StatusCode::OK, newly_updated))
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {

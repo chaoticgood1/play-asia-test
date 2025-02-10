@@ -171,8 +171,8 @@ async fn test_get_items_no_item() {
 }
 
 #[tokio::test]
-async fn test_get_items_using_id() {
-  let data_path = "test_get_items_using_id.json".to_string();
+async fn test_get_items_by_id() {
+  let data_path = "test_get_items_by_id.json".to_string();
   delete_file_if_exists(&data_path);
 
   let items: Vec<Item> = vec![
@@ -241,6 +241,40 @@ async fn test_put_item_no_jwt() {
 
   delete_file_if_exists(&data_path);
 }
+
+#[tokio::test]
+async fn test_put_item_with_jwt_by_id() {
+  let data_path = "test_put_item_with_jwt_by_id.json".to_string();
+  delete_file_if_exists(&data_path);
+
+  let items: Vec<Item> = vec![
+    Item { id: 1, name: "PutItem1".to_string() }
+  ];
+  create_data(data_path.clone(), &items);
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let token = get_jwt(&client).await;
+  let res = client
+    .put("/items/1")
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
+    .body_json(&json!({
+      "name": "NewPutItemName1"
+    }))
+    .send()
+    .await;
+
+  res.assert_status(StatusCode::OK);
+  res.assert_json(json!({
+    "id": 1,
+    "name": "NewPutItemName1"
+  })).await;
+
+  delete_file_if_exists(&data_path);
+}
+
+
+
 
 
 fn create_data<T: serde::Serialize>(data_path: String, data: &T) {
