@@ -115,7 +115,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
       Some(res) => res,
       None => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error put_item 3".to_string(),
+          error: "Server error put_item 1".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -125,7 +125,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
       Some(res) => res,
       None =>  {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error put_item 4".to_string(),
+          error: "Server error put_item 2".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -136,7 +136,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
         Some(res) => res,
         None => {
           return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-            error: "Server error put_item 6".to_string(),
+            error: "Server error put_item 3".to_string(),
             msg: "Please contact support".to_string()
           }))
         }
@@ -146,7 +146,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
         Some(res) => res,
         None => {
           return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-            error: "Server error post_item 4".to_string(),
+            error: "Server error put_item 4".to_string(),
             msg: "Please contact support".to_string()
           }))
         }
@@ -171,7 +171,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error post_item 5".to_string(),
+          error: "Server error put_item 5".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -181,7 +181,7 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
       Ok(res) => res,
       Err(_e) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Server error post_item 6".to_string(),
+          error: "Server error put_item 6".to_string(),
           msg: "Please contact support".to_string()
         }))
       }
@@ -192,8 +192,8 @@ async fn put_item(req: &Request, id: Path<u64>, item_req: Json<ItemReq>, data_pa
   }
   
   Err(error_response_json(StatusCode::BAD_REQUEST, ErrorResponse {
-    error: "Server error post_item 7".to_string(),
-    msg: "Item already exists".to_string()
+    error: "Server error put_item 7".to_string(),
+    msg: "Item doesn't exist".to_string()
   }))
 }
 
@@ -361,7 +361,7 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
       Ok(res) => res,
       Err(_) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Error reading data.json".to_string(),
+          error: format!("Error reading {:?}", self.data_path),
           msg: "Please contact support".to_string()
         }))
       }
@@ -372,11 +372,12 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
       Ok(res) => res,
       Err(_) => {
         return Err(error_response_json(StatusCode::INTERNAL_SERVER_ERROR, ErrorResponse {
-          error: "Error parsing data.json".to_string(),
+          error: format!("Error parsing {:?}", self.data_path),
           msg: "Please contact support".to_string()
         }))
       }
     };
+
     req.extensions_mut().insert(items);
 
     if req.method() == Method::GET {
@@ -401,16 +402,18 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
 
           let key = DecodingKey::from_secret(SECRET_KEY.as_ref());
           let mut validation = Validation::new(Algorithm::HS256);
-          validation.validate_exp = true; // Check expiration
+          validation.validate_exp = true;
 
           if let Ok(_claims) = decode::<Claims>(token, &key, &validation) {
             let res = self.inner.call(req).await;
+
             match res {
               Ok(resp) => {
                 let resp = resp.into_response();
                 return Ok(resp)
               }
               Err(err) => {
+                // println!("3 {:?}", err);
                 return Err(err)
               }
             }
@@ -418,6 +421,8 @@ impl<E: Endpoint> Endpoint for AuthMiddlewareImpl<E> {
         }
       }
     }
+
+    
 
     Err(StatusCode::UNAUTHORIZED.into())
   }

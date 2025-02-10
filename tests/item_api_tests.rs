@@ -169,6 +169,27 @@ async fn test_get_items_by_id() {
   delete_file_if_exists(&data_path);
 }
 
+#[tokio::test]
+async fn test_get_items_by_id_not_existing() {
+  let data_path = "test_get_items_by_id_not_existing.json".to_string();
+  let items: Vec<Item> = vec![
+    Item { id: 1, name: "Item1".to_string() },
+    Item { id: 2, name: "Item2".to_string() },
+  ];
+
+  create_data(data_path.clone(), &items);
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let res = client.get("/items/3").send().await;
+  res.assert_status(StatusCode::NOT_FOUND);
+  res.assert_json(json!({
+    "error": "Not found",
+    "msg": "Item does not exist"
+  })).await;
+
+  delete_file_if_exists(&data_path);
+}
 
 #[tokio::test]
 async fn test_get_items_all() {
@@ -230,6 +251,33 @@ async fn test_put_item_with_jwt_by_id() {
   res.assert_json(json!({
     "id": 1,
     "name": "NewPutItemName1"
+  })).await;
+  delete_file_if_exists(&data_path);
+}
+
+#[tokio::test]
+async fn test_put_item_not_existing() {
+  let data_path = "test_put_item_not_existing.json".to_string();
+  let items: Vec<Item> = vec![
+    Item { id: 1, name: "PutItem1".to_string() }
+  ];
+  create_data(data_path.clone(), &items);
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let token = get_jwt(&client).await;
+  let res = client
+    .put("/items/2")
+    .body_json(&json!({
+      "name": "PutItem2"
+    }))
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
+    .send()
+    .await;
+  
+  // res.assert_status(StatusCode::BAD_REQUEST);
+  res.assert_json(json!({
+    "error": "Server error put_item 7",
+    "msg": "Item doesn't exist"
   })).await;
   delete_file_if_exists(&data_path);
 }
