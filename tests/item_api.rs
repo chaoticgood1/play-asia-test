@@ -1,7 +1,7 @@
-use std::{fs::{remove_file, OpenOptions}, io::Write};
+use std::{fs::{read_to_string, remove_file, OpenOptions}, io::Write, time::Duration};
 use play_asia::{all_routes, items::Item, users::LoginResponse};
-use poem::{http::{header, StatusCode}, test::TestClient};
-use serde_json::{json, to_string_pretty};
+use poem::{http::{header, StatusCode}, test::TestClient, Route};
+use serde_json::{from_str, json, to_string_pretty, Value};
 
 
 #[tokio::test]
@@ -27,33 +27,20 @@ async fn test_post_item_no_jwt() {
   delete_file_if_exists(&data_path);
 }
 
-
-
 #[tokio::test]
 async fn test_post_item_with_jwt() {
-  // Login user: admin1 ps: admin1
   let data_path = "test_post_item_with_jwt.json".to_string();
   delete_file_if_exists(&data_path);
-  let routes = all_routes(data_path.clone());
-  let client = TestClient::new(routes);
-
-  let mut login_req = client
-    .post("/users/login")
-    .body_json(&json!({
-      "name": "admin1",
-      "pass": "admin1"
-    }))
-    .send()
-    .await;
-
-  let login_body = login_req.0.take_body().into_json::<LoginResponse>().await.unwrap();
-
+  
   let items: Vec<Item> = vec![];
   create_data(data_path.clone(), &items);
 
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let token = get_jwt(&client).await;
   let res = client
     .post("/items")
-    .header(header::AUTHORIZATION, format!("Bearer {}", login_body.token))
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
     .body_json(&json!({
       "name": "NewItem"
     }))
@@ -72,35 +59,96 @@ async fn test_post_item_with_jwt() {
 }
 
 
-
-// FIXME: Unauthorized issue due to jwt
 #[tokio::test]
-async fn test_post_item_one_item() {
-  let data_path = "test_post_item_one_item.json".to_string();
+async fn test_post_item_three_items_with_data_persistence() {
+  let data_path = "test_post_item_three_items.json".to_string();
   delete_file_if_exists(&data_path);
-
+  
   let items: Vec<Item> = vec![];
   create_data(data_path.clone(), &items);
 
-  println!("1");
-
   let routes = all_routes(data_path.clone());
   let client = TestClient::new(routes);
-  println!("2");
+  let token = get_jwt(&client).await;
   let res = client
     .post("/items")
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
     .body_json(&json!({
-      "name": "NewItem"
+      "name": "NewItem1"
     }))
     .send()
     .await;
+  res.assert_status(StatusCode::CREATED);
+  res.assert_json(json!(
+    {
+      "id": 1,
+      "name": "NewItem1"
+    }
+  )).await;
 
-  println!("3");
-  res.assert_status(StatusCode::OK);
+  let res = client
+    .post("/items")
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
+    .body_json(&json!({
+      "name": "NewItem2"
+    }))
+    .send()
+    .await;
+  res.assert_status(StatusCode::CREATED);
+  res.assert_json(json!(
+    {
+      "id": 2,
+      "name": "NewItem2"
+    }
+  )).await;
 
-  res.assert_json(json!(vec![
-    Item { id: 1, name: "NewItem".to_string() }
-  ])).await;
+  let res = client
+    .post("/items")
+    .header(header::AUTHORIZATION, format!("Bearer {}", token))
+    .body_json(&json!({
+      "name": "NewItem3"
+    }))
+    .send()
+    .await;
+  
+
+  res.assert_status(StatusCode::CREATED);
+  res.assert_json(json!(
+    {
+      "id": 3,
+      "name": "NewItem3"
+    }
+  )).await;
+
+  // Simulate shutting down
+  drop(client);
+  std::thread::sleep(Duration::from_secs(1));
+  
+  // Check if data persisted
+  let data_str = read_to_string(data_path.as_str()).expect("Error reading data_path");
+  let items: Vec<Value> = from_str(&data_str).expect("Error converting to Vec");
+
+  let item_val1: Value = json!({
+    "id": 1,
+    "name": "NewItem1"
+  });
+  let item_val2: Value = json!({
+    "id": 2,
+    "name": "NewItem2"
+  });
+  let item_val3: Value = json!({
+    "id": 3,
+    "name": "NewItem3"
+  });
+  let items_to_check = vec![
+    item_val1,
+    item_val2,
+    item_val3
+  ];
+
+  for item_to_check in &items_to_check {
+    assert!(items.contains(item_to_check));
+  }
 
   delete_file_if_exists(&data_path);
 }
@@ -164,3 +212,22 @@ fn delete_file_if_exists(path: &str) {
     remove_file(path).unwrap();
   }
 }
+
+async fn get_jwt(client: &TestClient<Route>) -> String {
+  // Login user: admin1 ps: admin1
+
+  let mut login_req = client
+    .post("/users/login")
+    .body_json(&json!({
+      "name": "admin1",
+      "pass": "admin1"
+    }))
+    .send()
+    .await;
+
+  let login_body = login_req.0.take_body().into_json::<LoginResponse>().await.unwrap();
+  login_body.token
+}
+
+
+
