@@ -3,7 +3,7 @@ use play_asia::{all_routes, items::Item, users::LoginResponse};
 use poem::{http::{header, StatusCode}, test::TestClient, Route};
 use serde_json::{from_str, json, to_string_pretty, Value};
 
-
+// POST
 #[tokio::test]
 async fn test_post_item_no_jwt() {
   let data_path = "test_post_item_no_jwt.json".to_string();
@@ -58,10 +58,9 @@ async fn test_post_item_with_jwt() {
   delete_file_if_exists(&data_path);
 }
 
-
 #[tokio::test]
 async fn test_post_item_three_items_with_data_persistence() {
-  let data_path = "test_post_item_three_items.json".to_string();
+  let data_path = "test_post_item_three_items_with_data_persistence.json".to_string();
   delete_file_if_exists(&data_path);
   
   let items: Vec<Item> = vec![];
@@ -153,8 +152,7 @@ async fn test_post_item_three_items_with_data_persistence() {
   delete_file_if_exists(&data_path);
 }
 
-
-
+// GET
 #[tokio::test]
 async fn test_get_items_no_item() {
   let data_path = "test_get_items_no_item.json".to_string();
@@ -194,6 +192,31 @@ async fn test_get_items_with_items() {
 }
 
 
+// PUT
+#[tokio::test]
+async fn test_put_item_no_jwt() {
+  let data_path = "test_put_item_no_jwt.json".to_string();
+  delete_file_if_exists(&data_path);
+
+  let items: Vec<Item> = vec![
+    Item { id: 1, name: "PutItem1".to_string() }
+  ];
+  create_data(data_path.clone(), &items);
+
+  let routes = all_routes(data_path.clone());
+  let client = TestClient::new(routes);
+  let res = client
+    .put("/items/1")
+    .body_json(&json!({
+      "name": "NewPutItemName1"
+    }))
+    .send()
+    .await;
+
+  res.assert_status(StatusCode::UNAUTHORIZED);
+
+  delete_file_if_exists(&data_path);
+}
 
 
 fn create_data<T: serde::Serialize>(data_path: String, data: &T) {
